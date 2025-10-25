@@ -1,16 +1,32 @@
 "use client";
 
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts'; // Removed HistogramSeries
+import { createChart, ColorType, CandlestickSeries, Time } from 'lightweight-charts'; // Removed HistogramSeries
 
-const TradingChart = ({ launchpadPubkey }) => {
-  const chartContainerRef = useRef();
+interface TradingChartProps {
+  launchpadPubkey: string;
+}
+
+interface CandleData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  buyCount?: number;
+  sellCount?: number;
+}
+
+const TradingChart = ({ launchpadPubkey }: TradingChartProps) => {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
     const handleResize = () => {
-      chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+      if (chartContainerRef.current) {
+        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+      }
     };
 
     // Initialize the chart
@@ -57,10 +73,10 @@ const TradingChart = ({ launchpadPubkey }) => {
         const response = await fetch(`/api/ohlcv/${launchpadPubkey}?interval=1m`, {
           cache: 'no-store',
         });
-        const { candles } = await response.json();
+        const { candles } = await response.json() as { candles: CandleData[] };
 
         // Separate data for the price series
-        const priceData = candles.map(candle => {
+        const priceData = candles.map((candle: CandleData) => {
           const buyCount = candle.buyCount || 0;
           const sellCount = candle.sellCount || 0;
           const totalTrades = buyCount + sellCount;
@@ -81,7 +97,7 @@ const TradingChart = ({ launchpadPubkey }) => {
           }
           
           return {
-            time: new Date(candle.time).getTime() / 1000, // UTC timestamp in seconds
+            time: (new Date(candle.time).getTime() / 1000) as Time, // UTC timestamp in seconds
             open: adjustedOpen,
             high: Number(candle.high),
             low: Number(candle.low),

@@ -98,6 +98,7 @@ export function KYCDialog({ open, onOpenChange }: KYCDialogProps) {
       if (data.inquiryId && window.Persona) {
         const client = new window.Persona.Client({
           inquiryId: data.inquiryId,
+          templateId: data.templateId || process.env.NEXT_PUBLIC_PERSONA_TEMPLATE_ID || '',
           environment: data.environment || 'sandbox',
           onReady: () => {
             console.log('Persona is ready');
@@ -175,7 +176,7 @@ export function KYCDialog({ open, onOpenChange }: KYCDialogProps) {
     }
   };
 
-  const statusDisplay = getStatusDisplay(kycStatus);
+  const statusDisplay = getStatusDisplay(kycStatus as KYCStatus);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

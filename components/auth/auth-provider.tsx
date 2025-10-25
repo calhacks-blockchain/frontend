@@ -16,6 +16,7 @@ interface AuthContextValue {
   inviteCode: string;
   user: User | null;
   isLoading: boolean;
+  kycStatus: string | null;
   openLogin: () => void;
   openSignup: () => void;
   closeDialog: () => void;
@@ -27,6 +28,7 @@ interface AuthContextValue {
   setInviteCode: (code: string) => void;
   resetForm: () => void;
   logout: () => Promise<void>;
+  refreshKYCStatus: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextValue | undefined>(undefined);
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [inviteCode, setInviteCode] = React.useState('');
   const [user, setUser] = React.useState<User | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [kycStatus, setKycStatus] = React.useState<string | null>(null);
   const supabase = createClient();
 
   // Listen to auth state changes
@@ -97,6 +100,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }, [supabase.auth]);
 
+  const refreshKYCStatus = React.useCallback(async () => {
+    if (!user) {
+      setKycStatus(null);
+      return;
+    }
+    try {
+      const response = await fetch('/api/kyc/status');
+      if (response.ok) {
+        const data = await response.json();
+        setKycStatus(data.status || null);
+      } else {
+        // Handle non-OK HTTP responses by clearing stale status
+        console.error('Failed to fetch KYC status:', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        setKycStatus(null);
+      }
+    } catch (error) {
+      // Handle network/runtime errors
+      console.error('Failed to fetch KYC status (network/runtime error):', error);
+      setKycStatus(null);
+    }
+  }, [user]);
+
   const value = React.useMemo(
     () => ({
       currentDialog,
@@ -108,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       inviteCode,
       user,
       isLoading,
+      kycStatus,
       openLogin,
       openSignup,
       closeDialog,
@@ -119,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setInviteCode,
       resetForm,
       logout,
+      refreshKYCStatus,
     }),
     [
       currentDialog,
@@ -130,11 +160,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       inviteCode,
       user,
       isLoading,
+      kycStatus,
       openLogin,
       openSignup,
       closeDialog,
       resetForm,
       logout,
+      refreshKYCStatus,
     ]
   );
 

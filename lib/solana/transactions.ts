@@ -35,11 +35,17 @@ export async function buildAndSendTransaction(
   instructions: TransactionInstruction[],
   signers: Keypair[] = []
 ): Promise<string> {
+  // Validate wallet connection and public key upfront
   const provider = getPhantomProvider();
   if (!provider || !provider.isConnected) {
-    throw new Error('Phantom wallet not connected');
+    throw new Error('Phantom wallet not connected. Please connect your wallet and try again.');
   }
 
+  if (!provider.publicKey) {
+    throw new Error('Phantom wallet public key not available. Please reconnect your wallet.');
+  }
+
+  // Create connection and transaction
   const connection = new Connection(RPC_URL, 'confirmed');
   const transaction = new Transaction();
 
@@ -50,6 +56,8 @@ export async function buildAndSendTransaction(
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.lastValidBlockHeight = lastValidBlockHeight;
+
+  // Set fee payer (validated above, guaranteed to exist)
   transaction.feePayer = provider.publicKey;
 
   // Sign with any additional signers (e.g., new account keypairs)
@@ -57,10 +65,10 @@ export async function buildAndSendTransaction(
     transaction.partialSign(...signers);
   }
 
-  // Sign with Phantom
+  // Sign with Phantom (will fail fast if publicKey is invalid)
   const signed = await provider.signTransaction(transaction);
 
-  // Send transaction
+  // Send transaction (will fail fast if signature is invalid)
   const signature = await connection.sendRawTransaction(signed.serialize());
 
   // Wait for confirmation
