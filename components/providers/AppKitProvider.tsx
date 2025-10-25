@@ -17,11 +17,13 @@ export const AppKitProvider: React.FC<AppKitProviderProps> = ({ children }) => {
   useEffect(() => {
     // Initialize AppKit on client side only
     if (typeof window !== 'undefined' && !appKitInitialized) {
-      // Set up Solana Adapter
-      const solanaWeb3JsAdapter = new SolanaAdapter();
+      // Get projectId from environment
+      const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID;
 
-      // Get projectId from environment or use a placeholder
-      const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID || "YOUR_PROJECT_ID";
+      if (!projectId) {
+        console.error('NEXT_PUBLIC_REOWN_PROJECT_ID is not defined in environment variables');
+        throw new Error('NEXT_PUBLIC_REOWN_PROJECT_ID is required');
+      }
 
       // Create a metadata object
       const metadata = {
@@ -31,12 +33,15 @@ export const AppKitProvider: React.FC<AppKitProviderProps> = ({ children }) => {
         icons: ["/logo.png"],
       };
 
+      // Set up Solana Adapter
+      const solanaWeb3JsAdapter = new SolanaAdapter();
+
       // Create AppKit instance - this registers it globally
       createAppKit({
+        projectId,
         adapters: [solanaWeb3JsAdapter],
         networks: [solana, solanaDevnet],
         metadata: metadata,
-        projectId,
         features: {
           analytics: true,
           email: false,
