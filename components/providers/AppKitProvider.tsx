@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createAppKit } from "@reown/appkit/react";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
-import { solana, solanaDevnet } from "@reown/appkit/networks";
+import { solana, solanaDevnet, solanaTestnet } from "@reown/appkit/networks";
 
 interface AppKitProviderProps {
   children: React.ReactNode
@@ -40,7 +40,7 @@ export const AppKitProvider: React.FC<AppKitProviderProps> = ({ children }) => {
       createAppKit({
         projectId,
         adapters: [solanaWeb3JsAdapter],
-        networks: [solana, solanaDevnet],
+        networks: [solana, solanaDevnet, solanaTestnet],
         metadata: metadata,
         features: {
           analytics: true,

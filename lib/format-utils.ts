@@ -150,4 +150,11 @@ export function usdToSol(usd: number, solPrice: number = 100): number {
   return usd / solPrice;
 }
 
+/**
+ * Format SOL amounts with SOL suffix
+ */
+export function formatSol(amount: number, decimals?: number): string {
+  return `${formatNumber(amount, decimals)} SOL`;
+}
+
 

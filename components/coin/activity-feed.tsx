@@ -6,7 +6,7 @@ import { StartupData } from '@/types/startup';
 import { shortenAddress, timeAgo, formatNumber } from '@/lib/format-utils';
 import { cn } from '@/lib/utils';
 
-type SortField = 'age' | 'type' | 'mc' | 'amount' | 'total' | 'trader';
+type SortField = 'age' | 'type' | 'amount' | 'total' | 'trader';
 type SortDirection = 'asc' | 'desc';
 
 interface ActivityFeedProps {
@@ -28,16 +28,23 @@ export function ActivityFeed({ startup, launchpadPubkey }: ActivityFeedProps) {
       fetch(`/api/trades/${launchpadPubkey}`)
         .then(res => res.json())
         .then(data => {
-          // Convert timestamp strings back to Date objects
-          const tradesWithDates = data.map((trade: any) => ({
-            ...trade,
-            timestamp: new Date(trade.timestamp)
-          }));
-          setRealTrades(tradesWithDates);
+          // Check if data is an array (not an error object)
+          if (Array.isArray(data)) {
+            // Convert timestamp strings back to Date objects
+            const tradesWithDates = data.map((trade: any) => ({
+              ...trade,
+              timestamp: new Date(trade.timestamp)
+            }));
+            setRealTrades(tradesWithDates);
+          } else {
+            console.error('Trades API returned non-array data:', data);
+            setRealTrades([]);
+          }
           setLoading(false);
         })
         .catch(err => {
           console.error('Failed to fetch trades:', err);
+          setRealTrades([]);
           setLoading(false);
         });
     }
@@ -117,8 +124,6 @@ function TradesTab({ trades, ticker, loading }: { trades: any[]; ticker: string;
         return (new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) * direction;
       case 'type':
         return (a.type === 'buy' ? 1 : -1) * direction;
-      case 'mc':
-        return ((a.marketCap || a.total * 1000) - (b.marketCap || b.total * 1000)) * direction;
       case 'amount':
         return (a.amount - b.amount) * direction;
       case 'total':
@@ -146,10 +151,9 @@ function TradesTab({ trades, ticker, loading }: { trades: any[]; ticker: string;
   if (loading) {
     return (
       <div className="w-full">
-        <div className="grid grid-cols-6 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border group">
+        <div className="grid grid-cols-5 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border group">
           <SortableHeader field="age">Age</SortableHeader>
           <SortableHeader field="type">Type</SortableHeader>
-          <SortableHeader field="mc">MC</SortableHeader>
           <SortableHeader field="amount">Amount</SortableHeader>
           <SortableHeader field="total">Total USD</SortableHeader>
           <SortableHeader field="trader">Trader</SortableHeader>
@@ -164,10 +168,9 @@ function TradesTab({ trades, ticker, loading }: { trades: any[]; ticker: string;
   if (trades.length === 0) {
     return (
       <div className="w-full">
-        <div className="grid grid-cols-6 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border group">
+        <div className="grid grid-cols-5 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border group">
           <SortableHeader field="age">Age</SortableHeader>
           <SortableHeader field="type">Type</SortableHeader>
-          <SortableHeader field="mc">MC</SortableHeader>
           <SortableHeader field="amount">Amount</SortableHeader>
           <SortableHeader field="total">Total USD</SortableHeader>
           <SortableHeader field="trader">Trader</SortableHeader>
@@ -182,10 +185,9 @@ function TradesTab({ trades, ticker, loading }: { trades: any[]; ticker: string;
   return (
     <div className="w-full">
       {/* Table Header */}
-      <div className="grid grid-cols-6 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border group">
+      <div className="grid grid-cols-5 gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border group">
         <SortableHeader field="age">Age</SortableHeader>
         <SortableHeader field="type">Type</SortableHeader>
-        <SortableHeader field="mc">MC</SortableHeader>
         <SortableHeader field="amount">Amount</SortableHeader>
         <SortableHeader field="total">Total USD</SortableHeader>
         <SortableHeader field="trader">Trader</SortableHeader>
@@ -197,7 +199,7 @@ function TradesTab({ trades, ticker, loading }: { trades: any[]; ticker: string;
           <div
             key={trade.id}
             className={cn(
-              "grid grid-cols-6 gap-4 px-3 py-3 text-xs hover:bg-accent/10 transition-colors items-center",
+              "grid grid-cols-5 gap-4 px-3 py-3 text-xs hover:bg-accent/10 transition-colors items-center",
               index % 2 === 0 ? "bg-background" : "bg-muted/20"
             )}
           >
@@ -214,11 +216,6 @@ function TradesTab({ trades, ticker, loading }: { trades: any[]; ticker: string;
               {trade.type === 'buy' ? 'Buy' : 'Sell'}
             </div>
 
-            {/* MC (Market Cap at time of trade) */}
-            <div className="text-foreground font-medium">
-              ${formatNumber(trade.marketCap || trade.total * 1000, 1)}
-            </div>
-
             {/* Amount */}
             <div className="text-foreground">
               {formatNumber(trade.amount, 2)}
@@ -227,7 +224,7 @@ function TradesTab({ trades, ticker, loading }: { trades: any[]; ticker: string;
             {/* Total USD */}
             <div className={cn(
               'font-medium',
-              trade.type === 'buy' ? 'text-red-500' : 'text-green-500'
+              trade.type === 'buy' ? 'text-green-500' : 'text-red-500'
             )}>
               ${trade.total < 0.01 ? trade.total.toFixed(4) : trade.total.toFixed(2)}
             </div>

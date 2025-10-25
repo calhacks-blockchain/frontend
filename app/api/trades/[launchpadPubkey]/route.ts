@@ -36,7 +36,8 @@ export async function GET(
           timestamp,
           price,
           volume,
-          type
+          type,
+          wallet_address
         FROM trades 
         WHERE launchpad_pubkey = $1
         ORDER BY timestamp DESC
@@ -52,7 +53,7 @@ export async function GET(
         // Calculate derived fields for compatibility with existing UI
         amount: parseFloat(row.volume),
         total: parseFloat(row.price) * parseFloat(row.volume),
-        wallet: 'Unknown', // We don't track individual wallets in current schema
+        wallet: row.wallet_address || 'Unknown', // Trader's wallet address
         marketCap: null // We don't calculate market cap at time of trade
       }));
 

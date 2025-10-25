@@ -38,10 +38,19 @@ export const WalletConnector = ({ onDisconnect }: WalletConnectorProps) => {
   };
 
   const getNetworkName = (networkId: string | undefined) => {
-    if (!networkId) return 'Unknown Network';
+    if (!networkId) return '';
     
+    // Solana Mainnet - genesis hash: 5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp
     if (networkId.includes('5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp')) return 'Solana Mainnet';
-    return 'Unknown Network';
+    
+    // Solana Devnet - genesis hash: EtWTRABZaYq6iMfeYKouRu166VU2xqa1
+    if (networkId.includes('EtWTRABZaYq6iMfeYKouRu166VU2xqa1')) return 'Solana Devnet';
+    
+    // Solana Testnet - genesis hash: 4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z
+    if (networkId.includes('4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z')) return 'Solana Testnet';
+    
+    // If network is recognized but not matched, just return empty string to hide it
+    return '';
   };
 
   // Prevent hydration mismatch by not rendering until mounted
@@ -121,14 +130,7 @@ export const WalletConnector = ({ onDisconnect }: WalletConnectorProps) => {
       {/* Desktop - Full wallet info and AppKit button */}
       <div className="hidden sm:flex items-center space-x-3">
         {/* Custom wallet info display */}
-        <div className="flex flex-col items-end text-right">
-          <div className="text-sm font-medium text-primary">
-            {formatAddress(address)}
-          </div>
-          <div className="text-xs text-secondary">
-            {getNetworkName(selectedNetworkId)}
-          </div>
-        </div>
+        
         
         {/* AppKit's built-in button for account management */}
         <w3m-button size="sm" />

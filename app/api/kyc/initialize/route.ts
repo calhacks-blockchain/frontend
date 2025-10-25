@@ -84,8 +84,14 @@ export async function POST(request: Request) {
     }
 
     const personaData = await personaResponse.json();
+    if (!personaData?.data?.id) {
+      console.error('Invalid Persona response structure:', personaData);
+      return NextResponse.json(
+        { error: 'Failed to initialize verification' },
+        { status: 500 }
+      );
+    }
     const inquiryId = personaData.data.id;
-
     // Update user metadata with in_progress KYC status (not pending yet - that happens when they complete it)
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,

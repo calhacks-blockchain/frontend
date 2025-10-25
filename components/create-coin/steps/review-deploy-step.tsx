@@ -24,6 +24,12 @@ export function ReviewDeployStep({ onBack }: ReviewDeployStepProps) {
   const [deployError, setDeployError] = useState('');
 
   const handleDeploy = async () => {
+    // Prevent duplicate submissions
+    if (isDeploying) {
+      console.log('Deployment already in progress, ignoring duplicate request');
+      return;
+    }
+
     setIsDeploying(true);
     setDeployError('');
 
@@ -196,7 +202,7 @@ export function ReviewDeployStep({ onBack }: ReviewDeployStepProps) {
 
       console.log("Sending fully signed transaction to the network...");
 
-      let signature: string;
+      let signature: string | undefined;
       try {
         signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
           skipPreflight: false,
@@ -215,17 +221,82 @@ export function ReviewDeployStep({ onBack }: ReviewDeployStepProps) {
         }
 
         console.log("Transaction Confirmed! Signature:", signature);
-      } catch (sendError) {
-        if (sendError instanceof SendTransactionError) {
+      } catch (sendError: any) {
+        // Check if this is an "already processed" error first (before checking signature)
+        const errorMessage = sendError?.message || String(sendError);
+        const isAlreadyProcessed = errorMessage.includes('already been processed') || 
+                                   errorMessage.includes('AlreadyProcessed');
+        
+        if (isAlreadyProcessed) {
+          // This can happen if the same transaction was sent before
+          console.warn("Transaction already processed - possible duplicate submission");
+          
+          // Try to extract signature from the signed transaction to verify
+          if (!signature) {
+            // We don't have a signature from sendRawTransaction, but the transaction might exist
+            // Get the transaction signature from the serialized transaction
+            try {
+              // Import bs58 for signature encoding
+              const bs58 = await import('bs58');
+              const txSignature = signedTransaction.signatures[0];
+              if (txSignature && txSignature.signature) {
+                signature = bs58.default.encode(txSignature.signature);
+                console.log("Extracted signature from transaction:", signature);
+              }
+            } catch (e) {
+              console.warn("Could not extract signature from transaction:", e);
+            }
+          }
+          
+          if (signature) {
+            // Verify the transaction status
+            try {
+              const status = await connection.getSignatureStatus(signature);
+              if (status.value?.confirmationStatus === 'confirmed' || 
+                  status.value?.confirmationStatus === 'finalized') {
+                console.log("Verified transaction success:", status.value);
+                // Continue with success flow
+              } else if (status.value?.err) {
+                throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`);
+              } else {
+                console.log("Transaction status unknown, but was already processed - treating as success");
+              }
+            } catch (statusError) {
+              console.warn("Could not verify status:", statusError);
+              // Transaction was likely successful, continue
+              console.log("Continuing with deployment despite verification error");
+            }
+          } else {
+            // Can't verify without signature
+            throw new Error("Transaction already processed but signature unavailable. The deployment may have succeeded - please check your wallet and refresh.");
+          }
+        } else if (!signature) {
+          // Transaction wasn't sent and it's not an "already processed" error
+          if (sendError instanceof SendTransactionError) {
+            console.error("SendTransactionError details:", sendError);
+            const logs = sendError.logs || [];
+            throw new Error(`Transaction failed: ${sendError.message}\nLogs: ${logs.join('\n')}`);
+          }
+          throw sendError;
+        } else if (sendError instanceof SendTransactionError) {
           console.error("SendTransactionError details:", sendError);
           const logs = sendError.logs || [];
-          const errorMessage = `Transaction failed: ${sendError.message}\nLogs: ${logs.join('\n')}`;
-          throw new Error(errorMessage);
+          const errorMsg = `Transaction failed: ${sendError.message}\nLogs: ${logs.join('\n')}`;
+          throw new Error(errorMsg);
+        } else {
+          throw sendError;
         }
-        throw sendError;
       }
 
       // Success! Now save campaign data to database
+      if (!signature) {
+        throw new Error('Transaction signature is missing');
+      }
+
+      // Log explorer link for verification
+      const explorerUrl = `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+      console.log(`Deployment successful! View on explorer: ${explorerUrl}`);
+
       try {
         const allFormData = useCreateCoinStore.getState().getAllData();
         

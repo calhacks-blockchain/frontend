@@ -4,10 +4,11 @@ import {
   getLaunchpadStateDecoder,
   LAUNCHPAD_STATE_DISCRIMINATOR,
   type LaunchpadState
-} from '@/lib/solana/generated/accounts/launchpadState';
+} from '../../../../../backend/dist/js-client/accounts/launchpadState';
 
 const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || 'DKBbcmAX3nRdSot1pwcXjEJ6cjWi5tEcSuciaeToprzv';
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 export async function GET(
   request: NextRequest,
@@ -49,6 +50,10 @@ export async function GET(
     const decoder = getLaunchpadStateDecoder();
     const launchpadState = decoder.decode(data);
 
+    // Convert lamports to SOL for solRaised and solRaiseTarget
+    const solRaisedSol = Number(launchpadState.solRaised) / LAMPORTS_PER_SOL;
+    const solRaiseTargetSol = Number(launchpadState.solRaiseTarget) / LAMPORTS_PER_SOL;
+
     const launchpadData = {
       authority: launchpadState.authority,
       platformAuthority: launchpadState.platformAuthority,
@@ -57,11 +62,13 @@ export async function GET(
       uri: launchpadState.uri,
       totalSupply: launchpadState.totalSupply.toString(),
       tokensForSale: launchpadState.tokensForSale.toString(),
-      solRaiseTarget: launchpadState.solRaiseTarget.toString(),
+      solRaiseTarget: solRaiseTargetSol, // Converted to SOL
+      solRaiseTargetLamports: launchpadState.solRaiseTarget.toString(), // Keep lamports version
       virtualSolReserves: launchpadState.virtualSolReserves.toString(),
       virtualTokenReserves: launchpadState.virtualTokenReserves.toString(),
       k: launchpadState.k.toString(),
-      solRaised: launchpadState.solRaised.toString(),
+      solRaised: solRaisedSol, // Converted to SOL
+      solRaisedLamports: launchpadState.solRaised.toString(), // Keep lamports version
       tokensSold: launchpadState.tokensSold.toString(),
       status: launchpadState.status,
       mint: launchpadState.mint,

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Menu, Equal } from 'lucide-react';
 import Image from 'next/image';
 import { useAppKitAccount } from "@reown/appkit/react";
 import { StartupData } from '@/types/startup';
 import { cn } from '@/lib/utils';
-import { formatCurrency, shortenAddress } from '@/lib/format-utils';
+import { formatSol, shortenAddress } from '@/lib/format-utils';
 
 interface LiveMetrics {
   currentPriceSol: number;
@@ -25,6 +25,11 @@ interface LiveMetrics {
   solRaised: number;
 }
 
+interface LaunchpadStateData {
+  solRaised: number;
+  solRaiseTarget: number;
+}
+
 interface TradingPanelProps {
   startup: StartupData;
   onSwitchToCompany?: () => void;
@@ -41,6 +46,35 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
   const [amount, setAmount] = useState<string>('');
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('5m');
   const [isTrading, setIsTrading] = useState(false);
+  const [launchpadState, setLaunchpadState] = useState<LaunchpadStateData | null>(null);
+  const [launchpadLoading, setLaunchpadLoading] = useState(true);
+
+  // Fetch launchpad state from blockchain
+  useEffect(() => {
+    const fetchLaunchpadState = async () => {
+      try {
+        setLaunchpadLoading(true);
+        const response = await fetch(`/api/launchpad/${startup.id}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch launchpad state');
+        }
+        const data = await response.json();
+        setLaunchpadState({
+          solRaised: data.solRaised,
+          solRaiseTarget: data.solRaiseTarget,
+        });
+      } catch (error) {
+        console.error('Error fetching launchpad state:', error);
+      } finally {
+        setLaunchpadLoading(false);
+      }
+    };
+
+    fetchLaunchpadState();
+    // Refresh every 10 seconds
+    const interval = setInterval(fetchLaunchpadState, 10000);
+    return () => clearInterval(interval);
+  }, [startup.id]);
 
   // Mock price changes for different time periods
   const priceChanges: Record<TimePeriod, number> = {
@@ -59,6 +93,12 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
 
     if (!isConnected || !address) {
       alert('Please connect your wallet first');
+      return;
+    }
+
+    // Prevent duplicate submissions
+    if (isTrading) {
+      console.log('Trade already in progress, ignoring duplicate request');
       return;
     }
 
@@ -95,7 +135,7 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
       const { instruction } = await response.json();
 
       // 4. Build and send transaction
-      const { Connection, Transaction, TransactionInstruction, PublicKey } = await import('@solana/web3.js');
+      const { Connection, Transaction, TransactionInstruction, PublicKey, SendTransactionError } = await import('@solana/web3.js');
       const connection = new Connection(
         process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com',
         'confirmed'
@@ -116,7 +156,7 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
       const transaction = new Transaction();
       transaction.add(ix);
 
-      const { blockhash } = await connection.getLatestBlockhash();
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = new PublicKey(walletPublicKey);
 
@@ -125,16 +165,110 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
       if (!provider) {
         throw new Error('Wallet provider not found');
       }
+      
+      console.log("Requesting wallet signature...");
       const signedTx = await provider.signTransaction(transaction);
 
-      // Send transaction
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
-      console.log('Transaction signature:', signature);
+      console.log("Sending transaction to the network...");
+      
+      let signature: string | undefined;
+      try {
+        // Send transaction with proper options
+        signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed'
+        });
+        console.log('Transaction signature:', signature);
 
-      // Wait for confirmation
-      await connection.confirmTransaction(signature);
+        // Wait for confirmation with proper structure
+        console.log("Waiting for confirmation...");
+        const confirmation = await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight
+        }, 'confirmed');
+
+        if (confirmation.value.err) {
+          throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        }
+
+        console.log("Transaction Confirmed!");
+      } catch (sendError: any) {
+        // Check if this is an "already processed" error first (before checking signature)
+        const errorMessage = sendError?.message || String(sendError);
+        const isAlreadyProcessed = errorMessage.includes('already been processed') || 
+                                   errorMessage.includes('AlreadyProcessed');
+        
+        if (isAlreadyProcessed) {
+          // This can happen if the same transaction was sent before
+          console.warn("Transaction already processed - possible duplicate submission");
+          
+          // Try to extract signature from the signed transaction to verify
+          if (!signature) {
+            // We don't have a signature from sendRawTransaction, but the transaction might exist
+            // Get the transaction signature from the serialized transaction
+            try {
+              // Import bs58 for signature encoding
+              const bs58 = await import('bs58');
+              const txSignature = signedTx.signatures[0];
+              if (txSignature && txSignature.signature) {
+                signature = bs58.default.encode(txSignature.signature);
+                console.log("Extracted signature from transaction:", signature);
+              }
+            } catch (e) {
+              console.warn("Could not extract signature from transaction:", e);
+            }
+          }
+          
+          if (signature) {
+            // Verify the transaction status
+            try {
+              const status = await connection.getSignatureStatus(signature);
+              if (status.value?.confirmationStatus === 'confirmed' || 
+                  status.value?.confirmationStatus === 'finalized') {
+                console.log("Verified transaction success:", status.value);
+                // Continue with success flow
+              } else if (status.value?.err) {
+                throw new Error(`Transaction failed: ${JSON.stringify(status.value.err)}`);
+              } else {
+                console.log("Transaction status unknown, but was already processed - treating as success");
+              }
+            } catch (statusError) {
+              console.warn("Could not verify status:", statusError);
+              // If we can't verify, reload the page to show updated state
+              alert("Transaction may have been processed already. Refreshing to show updated balances...");
+              window.location.reload();
+              return; // Exit early
+            }
+          } else {
+            // Can't verify, just reload
+            alert("Transaction may have been processed already. Refreshing to show updated balances...");
+            window.location.reload();
+            return; // Exit early
+          }
+        } else if (!signature) {
+          // Transaction wasn't sent and it's not an "already processed" error
+          if (sendError instanceof SendTransactionError) {
+            console.error("SendTransactionError details:", sendError);
+            const logs = sendError.logs || [];
+            throw new Error(`Transaction failed: ${sendError.message}\nLogs: ${logs.join('\n')}`);
+          }
+          throw sendError;
+        } else if (sendError instanceof SendTransactionError) {
+          console.error("SendTransactionError details:", sendError);
+          const logs = sendError.logs || [];
+          const errorMsg = `Transaction failed: ${sendError.message}\nLogs: ${logs.join('\n')}`;
+          throw new Error(errorMsg);
+        } else {
+          throw sendError;
+        }
+      }
 
       // Success!
+      if (signature) {
+        const explorerUrl = `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+        console.log(`Transaction successful! View on explorer: ${explorerUrl}`);
+      }
       alert(`Successfully ${tradeType === 'buy' ? 'bought' : 'sold'} ${startup.ticker}!`);
       setAmount('');
 
@@ -148,10 +282,10 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
     }
   };
 
-  // Calculate progress percentage using live metrics if available
-  const solRaised = liveMetrics?.solRaised ?? startup.raised;
-  const goal = startup.goal; // Goal is static from startup data
-  const progressPercentage = (solRaised / goal) * 100;
+  // Calculate progress percentage using blockchain data
+  const solRaised = launchpadState?.solRaised ?? 0;
+  const goal = launchpadState?.solRaiseTarget ?? 1; // Avoid division by zero
+  const progressPercentage = goal > 0 ? (solRaised / goal) * 100 : 0;
 
   return (
     <div className="bg-background text-foreground">
@@ -266,11 +400,11 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
             tradeType === 'buy'
               ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
               : 'bg-destructive hover:bg-destructive/90 text-white',
-            (!amount || parseFloat(amount) <= 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+            (!amount || parseFloat(amount) <= 0 || isTrading) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
           )}
-          disabled={!amount || parseFloat(amount) <= 0}
+          disabled={!amount || parseFloat(amount) <= 0 || isTrading}
         >
-          {tradeType === 'buy' ? 'Buy' : 'Sell'} {startup.ticker}
+          {isTrading ? 'Processing...' : `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${startup.ticker}`}
         </button>
       </div>
 
@@ -282,7 +416,9 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
         <div className="mb-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-foreground">Bonding Curve Progress</h3>
-            <span className="text-xs text-muted-foreground">{progressPercentage.toFixed(1)}%</span>
+            <span className="text-xs text-muted-foreground">
+              {launchpadLoading ? 'Loading...' : `${progressPercentage.toFixed(1)}%`}
+            </span>
           </div>
           
           {/* Progress Bar with Gradient Animation */}
@@ -300,14 +436,16 @@ export function TradingPanel({ startup, onSwitchToCompany, liveMetrics, metricsL
 
           <div className="flex items-center justify-between mt-2 text-xs">
             <span className="text-muted-foreground">
-              {metricsLoading ? 'Loading...' : `${formatCurrency(solRaised, 0)} raised`}
+              {launchpadLoading ? 'Loading...' : `${formatSol(solRaised, 2)} raised`}
             </span>
-            <span className="text-muted-foreground">Goal: {formatCurrency(goal, 0)}</span>
+            <span className="text-muted-foreground">
+              {launchpadLoading ? 'Loading goal...' : `Goal: ${formatSol(goal, 2)}`}
+            </span>
           </div>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          {metricsLoading ? 'Loading...' : `${formatCurrency(goal - solRaised, 0)} remaining until graduation`}
+          {launchpadLoading ? 'Loading...' : `${formatSol(goal - solRaised, 2)} remaining until graduation`}
         </p>
       </div>
 

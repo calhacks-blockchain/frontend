@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // This is the URL of your backend server
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001';
 
 export async function POST(request: Request) {
   try {

@@ -214,7 +214,11 @@ export function TradingTab({ startup, priceHistory, onSwitchToCompany }: Trading
               <div>
                 <span className="text-muted-foreground">Status </span>
                 <span className="font-medium text-foreground capitalize">
-                  {status ? status : <span className="text-muted-foreground">Unknown</span>}
+                  {status ? (
+                    status.toLowerCase() === 'safe' ? 'Safe (coin graduated)' : status
+                  ) : (
+                    <span className="text-muted-foreground">Unknown</span>
+                  )}
                 </span>
                 {status && (
                   <span className="text-xs text-green-500 ml-1">●</span>
