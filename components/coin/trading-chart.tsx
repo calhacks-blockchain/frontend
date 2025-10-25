@@ -1,0 +1,135 @@
+"use client";
+
+import React, { useEffect, useRef } from 'react';
+import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts'; // Removed HistogramSeries
+
+const TradingChart = ({ launchpadPubkey }) => {
+  const chartContainerRef = useRef();
+
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    const handleResize = () => {
+      chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+    };
+
+    // Initialize the chart
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: '#131722' },
+        textColor: '#D9D9D9',
+      },
+      grid: {
+        vertLines: { color: '#2A2E39' },
+        horzLines: { color: '#2A2E39' },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 500,
+    });
+
+    // Configure the main price scale
+    chart.priceScale('right').applyOptions({
+      borderColor: '#71649C',
+    });
+
+    // Configure the time scale
+    chart.timeScale().applyOptions({
+      borderColor: '#71649C',
+    });
+
+    // 1. Add the Candlestick Series for Price
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: '#26a69a',
+      downColor: '#ef5350',
+      borderVisible: false,
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+    });
+
+    // 2. --- VOLUME SERIES AND SCALE REMOVED ---
+    // const volumeSeries = ... (REMOVED)
+    // chart.priceScale('').applyOptions(...) (REMOVED)
+
+
+    // Fetch and process data from your API
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`/api/ohlcv/${launchpadPubkey}?interval=1m`, {
+          cache: 'no-store',
+        });
+        const { candles } = await response.json();
+
+        // Separate data for the price series
+        const priceData = candles.map(candle => {
+          const buyCount = candle.buyCount || 0;
+          const sellCount = candle.sellCount || 0;
+          const totalTrades = buyCount + sellCount;
+          
+          let adjustedClose = Number(candle.close);
+          let adjustedOpen = Number(candle.open);
+          
+          // If we have trade data, adjust the close price to reflect trade type dominance
+          if (totalTrades > 0) {
+            if (buyCount > sellCount) {
+              // More buys than sells - ensure close >= open for green candle
+              adjustedClose = Math.max(adjustedClose, adjustedOpen);
+            } else if (sellCount > buyCount) {
+              // More sells than buys - ensure close <= open for red candle
+              adjustedClose = Math.min(adjustedClose, adjustedOpen);
+            }
+            // If equal buys/sells, keep original prices
+          }
+          
+          return {
+            time: new Date(candle.time).getTime() / 1000, // UTC timestamp in seconds
+            open: adjustedOpen,
+            high: Number(candle.high),
+            low: Number(candle.low),
+            close: adjustedClose,
+          };
+        });
+
+        // --- VOLUME DATA PROCESSING REMOVED ---
+        // const volumeData = ... (REMOVED)
+
+        // Debug: Log sample candle data to see trade counts
+        if (candles.length > 0) {
+          console.log('Sample candle data with trade counts:', candles.slice(0, 3).map(c => ({
+            time: c.time,
+            buyCount: c.buyCount,
+            sellCount: c.sellCount,
+            open: c.open,
+            close: c.close,
+            high: c.high,
+            low: c.low
+          })));
+        }
+
+        // Set the data for the price series
+        candleSeries.setData(priceData);
+        // volumeSeries.setData(volumeData); // (REMOVED)
+
+        // Fit the chart content to the screen
+        chart.timeScale().fitContent();
+
+      } catch (error) {
+        console.error('Failed to fetch chart data:', error);
+      }
+    };
+
+    fetchData();
+
+    // Make the chart responsive
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
+    };
+  }, [launchpadPubkey]);
+
+  return <div ref={chartContainerRef} id="trading-chart-container" />;
+};
+
+export default TradingChart;
