@@ -11,10 +11,13 @@ import { useEffect } from 'react';
 
 function CreateCoinPage() {
   const router = useRouter();
-  const { openLogin, openSignup, user, logout } = useAuth();
+  const { openLogin, openSignup, user, logout, isLoading } = useAuth();
 
   // Redirect to home if not authenticated
   useEffect(() => {
+    // Wait for auth to finish loading before checking user status
+    if (isLoading) return;
+    
     if (!user) {
       // Show login prompt
       openLogin();
@@ -24,7 +27,7 @@ function CreateCoinPage() {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [user, router, openLogin]);
+  }, [user, router, openLogin, isLoading]);
 
   return (
     <div className="w-full min-h-screen bg-background flex flex-col">
@@ -37,7 +40,14 @@ function CreateCoinPage() {
       />
 
       <main className="flex-1 container mx-auto px-4 py-8 max-w-screen-xl">
-        {user ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          </div>
+        ) : user ? (
           <>
             {/* Header */}
             <div className="text-center mb-12">

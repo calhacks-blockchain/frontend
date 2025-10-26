@@ -7,6 +7,8 @@ import { Navbar04 } from '@/components/ui/shadcn-io/navbar-04';
 import { CoinTabs, TabValue } from '@/components/coin/coin-tabs';
 import { TradingTab } from '@/components/coin/trading-tab';
 import { CompanyTab } from '@/components/coin/company-tab';
+import { AIResearchTab } from '@/components/coin/ai-research-tab';
+import { SafeDocumentTab } from '@/components/coin/safe-document-tab';
 import { getStartupById, generatePriceHistory } from '@/lib/mock-startups';
 import { StartupData, PriceDataPoint } from '@/types/startup';
 import { AuthProvider, useAuth } from '@/components/auth/auth-provider';
@@ -22,6 +24,9 @@ function CoinPage() {
   const [startup, setStartup] = useState<StartupData | null>(null);
   const [priceHistory, setPriceHistory] = useState<PriceDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [safeDocumentUrl, setSafeDocumentUrl] = useState<string | null>(null);
+  const [showSafeTab, setShowSafeTab] = useState(false);
+  const [launchpadStatus, setLaunchpadStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchLaunchpadData = async () => {
@@ -152,6 +157,74 @@ function CoinPage() {
 
         setStartup(startupData);
         setPriceHistory(chartData);
+
+        // Check status and handle SAFE document for Transition or Safe states
+        try {
+          const statusResponse = await fetch(`/api/status/${launchpadPubkey}`);
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            const status = statusData.status;
+            console.log('Current status:', status);
+            
+            // Store the status
+            setLaunchpadStatus(status);
+            
+            // Show SAFE tab for both Transition and Safe statuses
+            if (status === 'Transition' || status === 'Safe') {
+              setShowSafeTab(true);
+              
+              if (status === 'Transition') {
+                console.log('🎉 Funding goal reached! Triggering SAFE generation...');
+                
+                // Trigger SAFE generation for Transition state
+                const safeResponse = await fetch(`http://localhost:5001/api/check-and-generate-safe`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ launchpadStateAddress: launchpadPubkey })
+                });
+                
+                if (safeResponse.ok) {
+                  const safeData = await safeResponse.json();
+                  if (safeData.safeDocument) {
+                    // Store the SAFE document URL
+                    setSafeDocumentUrl(safeData.safeDocument.pdfUrl);
+                    
+                    // Show notification and switch to SAFE document tab
+                    alert(`🎉 Congratulations! Funding goal reached!\n\nSAFE document has been generated.\n\nView it in the SAFE Document tab.`);
+                    setActiveTab('safe-document');
+                  }
+                }
+              } else if (status === 'Safe') {
+                // For Safe status, load existing SAFE document from cache
+                console.log('Campaign already graduated. Loading SAFE document...');
+                
+                const safeResponse = await fetch(`http://localhost:5001/api/check-and-generate-safe`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ launchpadStateAddress: launchpadPubkey })
+                });
+                
+                if (safeResponse.ok) {
+                  const safeData = await safeResponse.json();
+                  console.log('Safe document response:', safeData);
+                  
+                  if (safeData.safeDocument && safeData.safeDocument.pdfUrl) {
+                    console.log('Setting document URL:', safeData.safeDocument.pdfUrl);
+                    setSafeDocumentUrl(safeData.safeDocument.pdfUrl);
+                  } else {
+                    console.error('No safeDocument in response:', safeData);
+                  }
+                } else {
+                  console.error('Failed to load SAFE document:', await safeResponse.text());
+                }
+              }
+            }
+          }
+        } catch (statusError) {
+          console.error('Error checking status:', statusError);
+          // Don't block page load if status check fails
+        }
+
       } catch (error) {
         console.error('Error fetching launchpad data:', error);
         // Fallback to mock data
@@ -222,6 +295,7 @@ function CoinPage() {
         <CoinTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          showSafeDocument={showSafeTab}
         />
       </div>
 
@@ -235,6 +309,20 @@ function CoinPage() {
         )}
         {activeTab === 'company' && (
           <CompanyTab startup={startup} />
+        )}
+        {activeTab === 'ai-research' && (
+          <AIResearchTab startup={startup} />
+        )}
+        {activeTab === 'safe-document' && startup && (
+          <SafeDocumentTab 
+            launchpadAddress={params.id as string}
+            safeDocumentUrl={safeDocumentUrl || undefined}
+            currentStatus={launchpadStatus || undefined}
+            onGraduated={() => {
+              // Refresh the page to show new status
+              window.location.reload();
+            }}
+          />
         )}
       </main>
 

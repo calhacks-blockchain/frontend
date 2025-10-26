@@ -2,19 +2,25 @@
 
 import { cn } from '@/lib/utils';
 
-export type TabValue = 'trading' | 'company' | 'documents';
+export type TabValue = 'trading' | 'company' | 'documents' | 'ai-research' | 'safe-document';
 
 interface CoinTabsProps {
   activeTab: TabValue;
   onTabChange: (tab: TabValue) => void;
+  showSafeDocument?: boolean; // Show SAFE Document tab when in Transition status
 }
 
-const tabs = [
+const baseTabs = [
   { value: 'trading' as const, label: 'Trading' },
-  { value: 'company' as const, label: 'Company Info' }
+  { value: 'company' as const, label: 'Company Info' },
+  { value: 'ai-research' as const, label: 'AI Research' }
 ];
 
-export function CoinTabs({ activeTab, onTabChange }: CoinTabsProps) {
+const safeDocumentTab = { value: 'safe-document' as const, label: '🔐 SAFE Document' };
+
+export function CoinTabs({ activeTab, onTabChange, showSafeDocument }: CoinTabsProps) {
+  const tabs = showSafeDocument ? [...baseTabs, safeDocumentTab] : baseTabs;
+
   return (
     <div className="border-b border-border bg-card/30">
       <div className="flex gap-1">

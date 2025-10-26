@@ -7,7 +7,7 @@ import {
 } from '@/lib/solana/generated/accounts/launchpadState';
 
 const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
-const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || 'DKBbcmAX3nRdSot1pwcXjEJ6cjWi5tEcSuciaeToprzv';
+const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || 'DNRBFcPUmzVbxcStwSrvettxNYxCfrBUEj4hksd9aKRq';
 
 // Helper function to fetch metadata from URI
 async function fetchMetadata(uri: string) {
