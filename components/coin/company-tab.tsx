@@ -89,37 +89,26 @@ export function CompanyTab({ startup }: CompanyTabProps) {
         </section>
 
         {/* Company Slider */}
-        <section className="mb-10">
-          <Carousel
-            autoPlayInterval={6000}
-            className="w-full"
-          >
-            <div className="relative w-full h-[400px] bg-muted rounded-lg overflow-hidden">
-              <Image
-                src="/company-slider/first-slide.png"
-                alt="Company showcase 1"
-                fill
-                className="object-cover"
-              />
-            </div>
-            <div className="relative w-full h-[400px] bg-muted rounded-lg overflow-hidden">
-              <Image
-                src="/company-slider/second-slide.png"
-                alt="Company showcase 2"
-                fill
-                className="object-cover"
-              />
-            </div>
-            <div className="relative w-full h-[400px] bg-muted rounded-lg overflow-hidden">
-              <Image
-                src="/company-slider/third-slide.png"
-                alt="Company showcase 3"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </Carousel>
-        </section>
+        {startup.sliderImages && startup.sliderImages.length > 0 && (
+          <section className="mb-10">
+            <Carousel
+              autoPlayInterval={6000}
+              className="w-full"
+            >
+              {startup.sliderImages.map((image, index) => (
+                <div key={index} className="relative w-full h-[400px] bg-muted rounded-lg overflow-hidden">
+                  <Image
+                    src={image}
+                    alt={`Company showcase ${index + 1}`}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+              ))}
+            </Carousel>
+          </section>
+        )}
 
         {/* Latest Updates - Real Tweets from X */}
         {startup.tweetIds && startup.tweetIds.length > 0 && (

@@ -147,27 +147,39 @@ export function ReviewDeployStep({ onBack }: ReviewDeployStepProps) {
       // const totalSupply = BigInt(numTotalSupply) * tokenMultiplier; // ← REMOVE THIS
       // const tokensForSaleWithDecimals = k * tokenMultiplier; // ← REMOVE THIS
 
+      const initPayload = {
+        authority: walletPublicKey,
+        launchpadState: launchpadState.publicKey.toString(),
+        mint: mint.publicKey.toString(),
+        tokenVault: tokenVault.publicKey.toString(),
+        raiseTokenName: basicInfo.name,
+        raiseTokenSymbol: basicInfo.ticker,
+        raiseTokenUri: tokenUri,
+        totalSupply: totalSupply.toString(),
+        tokensForSale: tokensForSale.toString(),
+        initialPriceLamportsPerToken: initialPriceLamportsPerToken.toString(),
+        solRaiseTarget: targetRaiseLamports.toString(),
+      };
+
+      console.log('Sending initialize-campaign request:', initPayload);
+
       const initResponse = await fetch('/api/initialize-campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          authority: walletPublicKey,
-          launchpadState: launchpadState.publicKey.toString(),
-          mint: mint.publicKey.toString(),
-          tokenVault: tokenVault.publicKey.toString(),
-          raiseTokenName: basicInfo.name,
-          raiseTokenSymbol: basicInfo.ticker,
-          raiseTokenUri: tokenUri,
-          totalSupply: totalSupply.toString(),
-          tokensForSale: tokensForSale.toString(),
-          initialPriceLamportsPerToken: initialPriceLamportsPerToken.toString(),
-          solRaiseTarget: targetRaiseLamports.toString(),
-        }),
+        body: JSON.stringify(initPayload),
       });
 
       if (!initResponse.ok) {
-        const error = await initResponse.json();
-        throw new Error(error.error || 'Failed to build transaction');
+        const errorText = await initResponse.text();
+        console.error('Initialize campaign error response:', errorText);
+        let errorMessage = 'Failed to build transaction';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch (e) {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const { initialize, createToken } = await initResponse.json();

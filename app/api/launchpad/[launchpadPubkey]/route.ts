@@ -4,7 +4,7 @@ import {
   getLaunchpadStateDecoder,
   LAUNCHPAD_STATE_DISCRIMINATOR,
   type LaunchpadState
-} from '../../../../../backend/dist/js-client/accounts/launchpadState';
+} from '@/lib/solana/generated/accounts/launchpadState';
 
 const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID || 'DKBbcmAX3nRdSot1pwcXjEJ6cjWi5tEcSuciaeToprzv';

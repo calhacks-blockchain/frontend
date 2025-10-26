@@ -93,14 +93,25 @@ function CoinPage() {
           chartData = generatePriceHistory(currentPrice || 100, 30);
         }
 
+        // Fetch campaign data (company info)
+        let campaignData = null;
+        try {
+          const campaignResponse = await fetch(`/api/campaign/${launchpadPubkey}`);
+          if (campaignResponse.ok) {
+            campaignData = await campaignResponse.json();
+          }
+        } catch (error) {
+          console.error('Error fetching campaign data:', error);
+        }
+
         // Convert launchpad data to StartupData format
         const startupData: StartupData = {
           id: launchpadPubkey,
-          name: launchpadData.raiseTokenName || 'Unknown Token',
-          ticker: launchpadData.raiseTokenSymbol || 'UNKNOWN',
-          logo: logoUrl,
-          tagline: metadata?.name || launchpadData.raiseTokenName || 'Decentralized token on Solana',
-          elevatorPitch: description,
+          name: campaignData?.name || launchpadData.raiseTokenName || 'Unknown Token',
+          ticker: campaignData?.symbol || launchpadData.raiseTokenSymbol || 'UNKNOWN',
+          logo: campaignData?.logo_url || logoUrl,
+          tagline: campaignData?.tagline || metadata?.name || launchpadData.raiseTokenName || 'Decentralized token on Solana',
+          elevatorPitch: campaignData?.elevator_pitch || description,
           price: currentPrice,
           priceChange24h: 0,
           marketCap: 0,
@@ -108,29 +119,31 @@ function CoinPage() {
           holders: 0,
           totalSupply: parseFloat(launchpadData.totalSupply || '0') / 1e9,
           raised: parseFloat(launchpadData.solRaised || '0') / 1e9, // Convert lamports to SOL
-          goal: parseFloat(launchpadData.tokensForSale || '1000000000000000') / 1e9,
-          equityOffered: 0,
-          founderAllocation: 0,
-          created: new Date(),
-          daysActive: 0,
+          goal: campaignData?.fundraising_goal || parseFloat(launchpadData.tokensForSale || '1000000000000000') / 1e9,
+          equityOffered: campaignData?.equity_offered || 0,
+          founderAllocation: campaignData?.founder_allocation || 0,
+          created: campaignData?.created_at ? new Date(campaignData.created_at) : new Date(),
+          daysActive: campaignData?.created_at ? Math.floor((Date.now() - new Date(campaignData.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
           founder: {
             name: 'Unknown',
             wallet: launchpadData.authority || '',
           },
           contractAddress: params.id as string,
           blockchain: 'solana',
-          website: '',
-          twitter: '',
-          discord: '',
-          telegram: '',
-          problem: '',
-          solution: '',
-          whyNow: '',
-          traction: [],
-          roadmap: [],
-          team: [],
-          tokenDistribution: [],
-          useOfFunds: [],
+          website: campaignData?.website_url || '',
+          twitter: campaignData?.twitter_url || '',
+          discord: campaignData?.discord_url || '',
+          telegram: campaignData?.telegram_url || '',
+          problem: campaignData?.problem || '',
+          solution: campaignData?.solution || '',
+          whyNow: campaignData?.why_now || '',
+          traction: campaignData?.traction_metrics || [],
+          roadmap: campaignData?.roadmap_items || [],
+          team: campaignData?.team_members || [],
+          tokenDistribution: campaignData?.token_distribution || [],
+          useOfFunds: campaignData?.use_of_funds || [],
+          sliderImages: campaignData?.slider_images || [],
+          tweetIds: campaignData?.tweet_ids || [],
           hasGraduated: !launchpadData.isActive,
           topHolders: [],
           recentTrades: [],

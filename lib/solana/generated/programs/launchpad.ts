@@ -22,7 +22,7 @@ import {
 } from '../instructions';
 
 export const LAUNCHPAD_PROGRAM_ADDRESS =
-  '9hXeVKoGW9fy7NqjreEbocTDmbLD3T2ycWNYJiujx6pb' as Address<'9hXeVKoGW9fy7NqjreEbocTDmbLD3T2ycWNYJiujx6pb'>;
+  'DKBbcmAX3nRdSot1pwcXjEJ6cjWi5tEcSuciaeToprzv' as Address<'DKBbcmAX3nRdSot1pwcXjEJ6cjWi5tEcSuciaeToprzv'>;
 
 export enum LaunchpadAccount {
   LaunchpadState,
@@ -121,7 +121,7 @@ export function identifyLaunchpadInstruction(
 }
 
 export type ParsedLaunchpadInstruction<
-  TProgram extends string = '9hXeVKoGW9fy7NqjreEbocTDmbLD3T2ycWNYJiujx6pb',
+  TProgram extends string = 'DKBbcmAX3nRdSot1pwcXjEJ6cjWi5tEcSuciaeToprzv',
 > =
   | ({
       instructionType: LaunchpadInstruction.BuyToken;

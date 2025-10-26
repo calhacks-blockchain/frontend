@@ -23,38 +23,28 @@ Copy the generated client files into the frontend project at `lib/solana/generat
 
 Whenever the Solana program changes and Codama regenerates the client:
 
-### Step 1: Regenerate in Backend
+### Using the Sync Script (Recommended)
 ```bash
-cd peterpan-backend
-# Run your Codama generation script
-# This updates peterpan-backend/dist/js-client/
+# From the project root
+./sync-generated.sh
 ```
 
-### Step 2: Copy to Frontend
+This script will:
+1. Check if backend files exist
+2. Copy all generated files to the frontend
+3. Confirm successful sync
+
+### Manual Sync
 ```bash
-cd /Users/omarlahloumimi/peterpain-main
-cp -r peterpan-backend/dist/js-client/* peterpan/lib/solana/generated/
+# From the project root
+cp -r backend/dist/js-client/* frontend/lib/solana/generated/
 ```
 
-### Step 3: Verify
+### Verify
 ```bash
-cd peterpan
+cd frontend
 npm run build
 ```
-
-## Alternative: Automated Sync
-
-You can add this to your package.json scripts:
-
-```json
-{
-  "scripts": {
-    "sync-client": "cp -r ../peterpan-backend/dist/js-client/* lib/solana/generated/"
-  }
-}
-```
-
-Then run: `npm run sync-client`
 
 ## Note
 The `peterpan-backend/dist/js-client/` files should be committed to git since they're auto-generated from the program IDL and needed by the frontend.
